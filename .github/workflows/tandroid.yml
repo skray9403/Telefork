@@ -1,6 +1,7 @@
 name: Fork Client
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - '**'
