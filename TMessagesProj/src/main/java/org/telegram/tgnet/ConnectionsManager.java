@@ -264,6 +264,17 @@ public class ConnectionsManager extends BaseController {
             mainPreferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig" + currentAccount, Activity.MODE_PRIVATE);
         }
         forceTryIpV6 = mainPreferences.getBoolean("forceTryIpV6", false);
+        // Report a privacy-preserving device identity to Telegram by default.
+        // This value is shared by all local accounts and is read at connection
+        // initialization, so changing it takes effect after an app restart.
+        SharedPreferences identityPreferences = MessagesController.getGlobalMainSettings();
+        String deviceIdentityMode = identityPreferences.getString("deviceIdentityMode", "generic");
+        if ("generic".equals(deviceIdentityMode)) {
+            deviceModel = "Android";
+        } else if ("custom".equals(deviceIdentityMode)) {
+            String customDeviceModel = identityPreferences.getString("deviceIdentityCustom", "").trim();
+            deviceModel = customDeviceModel.isEmpty() ? "Android" : customDeviceModel;
+        }
         boolean userPremium = false;
         if (getUserConfig().getCurrentUser() != null) {
             userPremium = getUserConfig().getCurrentUser().premium;

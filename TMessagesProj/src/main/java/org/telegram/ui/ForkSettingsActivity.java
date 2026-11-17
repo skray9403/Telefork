@@ -162,6 +162,7 @@ public class ForkSettingsActivity extends BaseFragment {
     public static final int ID_WEB_PUBLISH = 101;
     public static final int ID_VOICE_TIMECODES = 102;
     public static final int ID_QUICK_ATTACH = 103;
+    public static final int ID_DEVICE_IDENTITY = 104;
 
     public static final int ID_EXPORT_SETTINGS = 95;
     public static final int ID_IMPORT_SETTINGS = 96;
@@ -729,6 +730,9 @@ public class ForkSettingsActivity extends BaseFragment {
         items.add(UItem.asShadow(null));
 
         items.add(UItem.asHeader(LocaleController.getString(R.string.ForkSectionSystem)));
+        items.add(UItem.asSettingsCell(ID_DEVICE_IDENTITY,
+            LocaleController.getString(R.string.DeviceIdentity), getDeviceIdentityText()));
+        items.add(UItem.asShadow(LocaleController.getString(R.string.DeviceIdentityRestartInfo)));
         items.add(UItem.asButtonCheck(ID_WEBSOCKET_TRANSPORT, LocaleController.getString(R.string.WebSocketTransport), LocaleController.getString(R.string.WebSocketTransportInfo))
             .setChecked(pref("webSocketTransport", false)).setMultiline(true));
         if (pref("webSocketTransport", false)) {
@@ -938,6 +942,8 @@ public class ForkSettingsActivity extends BaseFragment {
         } else if (id == ID_QUICK_REPEAT) {
             toggle("quickRepeatButton", item, view);
 
+        } else if (id == ID_DEVICE_IDENTITY) {
+            showDeviceIdentityDialog();
         } else if (id == ID_WEBSOCKET_TRANSPORT) {
             boolean value = toggle("webSocketTransport", item, view);
             ForkSettings.applyEffect(currentAccount, "webSocketTransport", value);
@@ -1251,6 +1257,55 @@ public class ForkSettingsActivity extends BaseFragment {
                 }
                 return null;
             });
+    }
+
+    private static String getDeviceIdentityText() {
+        String mode = prefs().getString("deviceIdentityMode", "generic");
+        if ("actual".equals(mode)) {
+            return LocaleController.getString(R.string.DeviceIdentityActual);
+        }
+        if ("custom".equals(mode)) {
+            String custom = prefs().getString("deviceIdentityCustom", "").trim();
+            return custom.isEmpty() ? LocaleController.getString(R.string.DeviceIdentityGeneric) : custom;
+        }
+        return LocaleController.getString(R.string.DeviceIdentityGeneric);
+    }
+
+    private void showDeviceIdentityDialog() {
+        final String[] options = new String[] {
+            LocaleController.getString(R.string.DeviceIdentityGeneric),
+            LocaleController.getString(R.string.DeviceIdentityActual),
+            LocaleController.getString(R.string.DeviceIdentityCustom)
+        };
+        String mode = prefs().getString("deviceIdentityMode", "generic");
+        int selected = "actual".equals(mode) ? 1 : ("custom".equals(mode) ? 2 : 0);
+        showRadioDialog(LocaleController.getString(R.string.DeviceIdentity), options, selected, index -> {
+            if (index == 2) {
+                org.telegram.messenger.forkgram.ForkDialogs.createFieldAlert(
+                    getContext(),
+                    LocaleController.getString(R.string.DeviceIdentityCustom),
+                    prefs().getString("deviceIdentityCustom", "Telefork Android"),
+                    result -> {
+                        String custom = result == null ? "" : result.trim();
+                        if (custom.isEmpty()) {
+                            org.telegram.ui.Components.BulletinFactory.of(this)
+                                .createErrorBulletin(LocaleController.getString(R.string.DeviceIdentityCustomRequired)).show();
+                            return null;
+                        }
+                        prefs().edit()
+                            .putString("deviceIdentityCustom", custom)
+                            .putString("deviceIdentityMode", "custom")
+                            .commit();
+                        listView.adapter.update(false);
+                        return null;
+                    });
+            } else {
+                prefs().edit()
+                    .putString("deviceIdentityMode", index == 0 ? "generic" : "actual")
+                    .commit();
+                listView.adapter.update(false);
+            }
+        });
     }
 
     private static String getWebSocketDomainText() {

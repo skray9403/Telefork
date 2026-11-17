@@ -72,6 +72,12 @@
     <string name="CopyWithoutProtocol">Copy without protocol</string>
     <!--fork settings view-->
     <string name="ForkSettingsTitle">Fork Client Settings</string>
+    <string name="DeviceIdentity">Telegram device identity</string>
+    <string name="DeviceIdentityGeneric">Generic Android</string>
+    <string name="DeviceIdentityActual">Actual device model</string>
+    <string name="DeviceIdentityCustom">Custom device name</string>
+    <string name="DeviceIdentityCustomRequired">Enter a device name.</string>
+    <string name="DeviceIdentityRestartInfo">Controls the device model shown in Telegram active sessions. Changes apply after restarting Telefork.</string>
     <string name="ForkCheckUpdate">Check updates</string>
     <string name="InAppCamera">Enable In-App Camera</string>
     <string name="InAppCameraInfo">In Attachments</string>

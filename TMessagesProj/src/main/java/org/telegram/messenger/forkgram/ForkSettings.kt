@@ -227,6 +227,14 @@ object ForkSettings {
         BoolOption("disableDefaultInAppBrowser", ForkSettingsActivity.ID_DISABLE_DEFAULT_IN_APP_BROWSER, BuildConfig.SKIP_INTERNAL_BROWSER_BY_DEFAULT),
         BoolOption("quickRepeatButton", ForkSettingsActivity.ID_QUICK_REPEAT, false),
 
+        StringOption(
+            "deviceIdentityMode", ForkSettingsActivity.ID_DEVICE_IDENTITY, "generic",
+            writeFn = { raw ->
+                if (raw != "generic" && raw != "actual" && raw != "custom") {
+                    throw IllegalArgumentException("expected generic, actual, or custom")
+                }
+                raw
+            }),
         BoolOption("webSocketTransport", ForkSettingsActivity.ID_WEBSOCKET_TRANSPORT, false),
         StringOption(
             "webSocketDomain", ForkSettingsActivity.ID_WEBSOCKET_DOMAIN, "",
