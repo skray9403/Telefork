@@ -44,32 +44,64 @@ jobs:
           echo "USER_REPO=$GITHUB_REPOSITORY" >> $GITHUB_ENV
           echo "CHECK_UPDATES=1" >> $GITHUB_ENV
       - name: Build.
+        env:
+          APP_ID_SECRET: ${{ secrets.APP_ID }}
+          APP_HASH_SECRET: ${{ secrets.APP_HASH }}
+          ALIAS_PASS_SECRET: ${{ secrets.ALIAS_PASS }}
+          ALIAS_NAME_SECRET: ${{ secrets.ALIAS_NAME }}
+          KEYSTORE_PASS_SECRET: ${{ secrets.KEYSTORE_PASS }}
+          USER_ID_OWNER_SECRET: ${{ secrets.USER_ID_OWNER }}
+          UPDATE_CHANNEL_USERNAME_SECRET: ${{ secrets.UPDATE_CHANNEL_USERNAME }}
+          LASTFM_API_KEY_SECRET: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_API_SECRET_SECRET: ${{ secrets.LASTFM_API_SECRET }}
         run: |
           ###
           vars=gradle.properties
 
-          echo "DUMMY_CONST=0" >> $vars
-          echo "org.gradle.workers.max=1" >> $vars
-          echo "APP_ID=${{ secrets.APP_ID }}" >> $vars
-          echo "APP_HASH=${{ secrets.APP_HASH }}" >> $vars
-          echo "RELEASE_KEY_PASSWORD=${{ secrets.ALIAS_PASS }}" >> $vars
-          echo "RELEASE_KEY_ALIAS=${{ secrets.ALIAS_NAME }}" >> $vars
-          echo "RELEASE_STORE_PASSWORD=${{ secrets.KEYSTORE_PASS }}" >> $vars
-          echo "RELEASE_KEYSTORE_FILE=$PWD/TMessagesProj/config/release.keystore" >> $vars
-          echo "ADDITIONAL_BUILD_NUMBER=$ADDITIONAL_BUILD_NUMBER" >> $vars
-          echo "USER_REPO=$USER_REPO" >> $vars
-          echo "CHECK_UPDATES=1" >> $vars
-          # USER_ID_OWNER is optional for personal forks. Keep the Gradle
-          # BuildConfig field valid when the repository secret is unset.
-          USER_ID_OWNER_VALUE="${{ secrets.USER_ID_OWNER }}"
-          if [[ ! "$USER_ID_OWNER_VALUE" =~ ^[0-9]+$ ]]; then
-            echo "::warning::USER_ID_OWNER is missing or not numeric; defaulting to 0."
-            USER_ID_OWNER_VALUE=0
+          echo "DUMMY_CONST=0" >> "$vars"
+          echo "org.gradle.workers.max=1" >> "$vars"
+
+          # Keep the checked-in Gradle defaults when an optional repository
+          # secret is absent. Never append an empty value over a valid default.
+          if [[ "$APP_ID_SECRET" =~ ^[0-9]+$ ]]; then
+            printf 'APP_ID=%s\\n' "$APP_ID_SECRET" >> "$vars"
+          else
+            echo "::warning::APP_ID is missing or not numeric; preserving the Gradle default (0). A valid Telegram API ID is required for login."
           fi
-          echo "USER_ID_OWNER=$USER_ID_OWNER_VALUE" >> "$vars"
-          echo "UPDATE_CHANNEL_USERNAME=${{ secrets.UPDATE_CHANNEL_USERNAME }}" >> $vars
-          echo "LASTFM_API_KEY=${{ secrets.LASTFM_API_KEY }}" >> $vars
-          echo "LASTFM_API_SECRET=${{ secrets.LASTFM_API_SECRET }}" >> $vars
+          if [[ -n "$APP_HASH_SECRET" ]]; then
+            printf 'APP_HASH=%s\\n' "$APP_HASH_SECRET" >> "$vars"
+          else
+            echo "::warning::APP_HASH is missing; preserving the Gradle default. A valid Telegram API hash is required for login."
+          fi
+
+          write_secret_if_set() {
+            local property_name="$1"
+            local secret_value="$2"
+            if [[ -n "$secret_value" ]]; then
+              printf '%s=%s\\n' "$property_name" "$secret_value" >> "$vars"
+            else
+              echo "::warning::$property_name secret is unset; preserving the Gradle default."
+            fi
+          }
+
+          write_secret_if_set RELEASE_KEY_PASSWORD "$ALIAS_PASS_SECRET"
+          write_secret_if_set RELEASE_KEY_ALIAS "$ALIAS_NAME_SECRET"
+          write_secret_if_set RELEASE_STORE_PASSWORD "$KEYSTORE_PASS_SECRET"
+          echo "RELEASE_KEYSTORE_FILE=$PWD/TMessagesProj/config/release.keystore" >> "$vars"
+          echo "ADDITIONAL_BUILD_NUMBER=$ADDITIONAL_BUILD_NUMBER" >> "$vars"
+          echo "USER_REPO=$USER_REPO" >> "$vars"
+          echo "CHECK_UPDATES=1" >> "$vars"
+
+          # USER_ID_OWNER is optional for personal forks.
+          if [[ "$USER_ID_OWNER_SECRET" =~ ^[0-9]+$ ]]; then
+            printf 'USER_ID_OWNER=%s\\n' "$USER_ID_OWNER_SECRET" >> "$vars"
+          else
+            echo "::warning::USER_ID_OWNER is missing or not numeric; preserving the Gradle default (0)."
+          fi
+
+          write_secret_if_set UPDATE_CHANNEL_USERNAME "$UPDATE_CHANNEL_USERNAME_SECRET"
+          write_secret_if_set LASTFM_API_KEY "$LASTFM_API_KEY_SECRET"
+          write_secret_if_set LASTFM_API_SECRET "$LASTFM_API_SECRET_SECRET"
 
           ###
           echo $ADDITIONAL_BUILD_NUMBER
