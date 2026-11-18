@@ -59,7 +59,14 @@ jobs:
           echo "ADDITIONAL_BUILD_NUMBER=$ADDITIONAL_BUILD_NUMBER" >> $vars
           echo "USER_REPO=$USER_REPO" >> $vars
           echo "CHECK_UPDATES=1" >> $vars
-          echo "USER_ID_OWNER=${{ secrets.USER_ID_OWNER }}" >> $vars
+          # USER_ID_OWNER is optional for personal forks. Keep the Gradle
+          # BuildConfig field valid when the repository secret is unset.
+          USER_ID_OWNER_VALUE="${{ secrets.USER_ID_OWNER }}"
+          if [[ ! "$USER_ID_OWNER_VALUE" =~ ^[0-9]+$ ]]; then
+            echo "::warning::USER_ID_OWNER is missing or not numeric; defaulting to 0."
+            USER_ID_OWNER_VALUE=0
+          fi
+          echo "USER_ID_OWNER=$USER_ID_OWNER_VALUE" >> "$vars"
           echo "UPDATE_CHANNEL_USERNAME=${{ secrets.UPDATE_CHANNEL_USERNAME }}" >> $vars
           echo "LASTFM_API_KEY=${{ secrets.LASTFM_API_KEY }}" >> $vars
           echo "LASTFM_API_SECRET=${{ secrets.LASTFM_API_SECRET }}" >> $vars
