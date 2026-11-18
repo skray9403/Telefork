@@ -87,7 +87,17 @@ jobs:
           write_secret_if_set RELEASE_KEY_PASSWORD "$ALIAS_PASS_SECRET"
           write_secret_if_set RELEASE_KEY_ALIAS "$ALIAS_NAME_SECRET"
           write_secret_if_set RELEASE_STORE_PASSWORD "$KEYSTORE_PASS_SECRET"
-          echo "RELEASE_KEYSTORE_FILE=$PWD/TMessagesProj/config/release.keystore" >> "$vars"
+
+          # Only select the private release keystore when all credentials are
+          # present. Otherwise let TMessagesProj_App/build.gradle use its
+          # built-in test.keystore fallback for CI/testing builds.
+          if [[ -n "$ALIAS_PASS_SECRET" && -n "$ALIAS_NAME_SECRET" && -n "$KEYSTORE_PASS_SECRET" ]]; then
+            echo "RELEASE_KEYSTORE_FILE=$PWD/TMessagesProj/config/release.keystore" >> "$vars"
+            echo "Using configured release keystore."
+          else
+            echo "::warning::Release signing secrets are incomplete; using test.keystore. This APK is for testing and cannot update an install signed with a different key."
+          fi
+
           echo "ADDITIONAL_BUILD_NUMBER=$ADDITIONAL_BUILD_NUMBER" >> "$vars"
           echo "USER_REPO=$USER_REPO" >> "$vars"
           echo "CHECK_UPDATES=1" >> "$vars"
