@@ -64,12 +64,12 @@ jobs:
           # Keep the checked-in Gradle defaults when an optional repository
           # secret is absent. Never append an empty value over a valid default.
           if [[ "$APP_ID_SECRET" =~ ^[0-9]+$ ]]; then
-            printf 'APP_ID=%s\\n' "$APP_ID_SECRET" >> "$vars"
+            printf 'APP_ID=%s\n' "$APP_ID_SECRET" >> "$vars"
           else
             echo "::warning::APP_ID is missing or not numeric; preserving the Gradle default (0). A valid Telegram API ID is required for login."
           fi
           if [[ -n "$APP_HASH_SECRET" ]]; then
-            printf 'APP_HASH=%s\\n' "$APP_HASH_SECRET" >> "$vars"
+            printf 'APP_HASH=%s\n' "$APP_HASH_SECRET" >> "$vars"
           else
             echo "::warning::APP_HASH is missing; preserving the Gradle default. A valid Telegram API hash is required for login."
           fi
@@ -78,7 +78,7 @@ jobs:
             local property_name="$1"
             local secret_value="$2"
             if [[ -n "$secret_value" ]]; then
-              printf '%s=%s\\n' "$property_name" "$secret_value" >> "$vars"
+              printf '%s=%s\n' "$property_name" "$secret_value" >> "$vars"
             else
               echo "::warning::$property_name secret is unset; preserving the Gradle default."
             fi
@@ -104,7 +104,7 @@ jobs:
 
           # USER_ID_OWNER is optional for personal forks.
           if [[ "$USER_ID_OWNER_SECRET" =~ ^[0-9]+$ ]]; then
-            printf 'USER_ID_OWNER=%s\\n' "$USER_ID_OWNER_SECRET" >> "$vars"
+            printf 'USER_ID_OWNER=%s\n' "$USER_ID_OWNER_SECRET" >> "$vars"
           else
             echo "::warning::USER_ID_OWNER is missing or not numeric; preserving the Gradle default (0)."
           fi
