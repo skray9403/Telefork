@@ -125,6 +125,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -198,6 +199,9 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
     public static int lastImageId = -1;
 
     public static final int REQUEST_CODE_DELETE_FROM_DEVICE = 9200;
+    public static final int REQUEST_CODE_SYSTEM_PHOTO_PICKER = 9201;
+    private static WeakReference<ChatAttachAlertPhotoLayout> systemPickerPendingLayout;
+    private boolean systemPickerLaunched;
     private static WeakReference<ChatAttachAlertPhotoLayout> deleteFromDevicePendingLayout;
     private MediaController.PhotoEntry deleteFromDevicePendingEntry;
     private boolean cancelTakingPhotos;
@@ -344,7 +348,138 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         }
 
         @Override
-        public HashMap<Object, Object> getSelectedPhotos() {
+    
+    private void launchSystemPhotoPicker() {
+        Activity activity = parentAlert.baseFragment != null ? parentAlert.baseFragment.getParentActivity() : null;
+        if (activity == null) {
+            systemPickerLaunched = false;
+            return;
+        }
+        Intent intent;
+        if (Build.VERSION.SDK_INT >= 33) {
+            intent = new Intent(MediaStore.ACTION_PICK_IMAGES);
+            intent.setType("*/*");
+            intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[] { "image/*", "video/*" });
+            intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        } else {
+            intent = new Intent(Intent.ACTION_GET_CONTENT);
+            intent.setType("*/*");
+            intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[] { "image/*", "video/*" });
+            intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+        }
+        try {
+            systemPickerPendingLayout = new WeakReference<>(this);
+            parentAlert.baseFragment.startActivityForResult(intent, REQUEST_CODE_SYSTEM_PHOTO_PICKER);
+        } catch (Exception e) {
+            systemPickerPendingLayout = null;
+            systemPickerLaunched = false;
+            FileLog.e(e);
+        }
+    }
+
+    public static void onSystemPhotoPickerResult(int resultCode, Intent data) {
+        ChatAttachAlertPhotoLayout layout = systemPickerPendingLayout != null ? systemPickerPendingLayout.get() : null;
+        systemPickerPendingLayout = null;
+        if (layout == null) {
+            return;
+        }
+        if (resultCode != Activity.RESULT_OK || data == null) {
+            layout.systemPickerLaunched = false;
+            return;
+        }
+        ArrayList<Uri> uris = new ArrayList<>();
+        if (data.getClipData() != null) {
+            for (int i = 0; i < data.getClipData().getItemCount(); i++) {
+                Uri uri = data.getClipData().getItemAt(i).getUri();
+                if (uri != null && !uris.contains(uri)) {
+                    uris.add(uri);
+                }
+            }
+        } else if (data.getData() != null) {
+            uris.add(data.getData());
+        }
+        if (uris.isEmpty()) {
+            layout.systemPickerLaunched = false;
+            return;
+        }
+        final ChatAttachAlertPhotoLayout target = layout;
+        Utilities.globalQueue.postRunnable(() -> {
+            ArrayList<MediaController.PhotoEntry> entries = new ArrayList<>();
+            for (int i = 0; i < uris.size(); i++) {
+                Uri uri = uris.get(i);
+                File copied = copyPickerUri(target, uri, i);
+                if (copied == null) {
+                    continue;
+                }
+                String mime = null;
+                try {
+                    mime = target.getContext().getContentResolver().getType(uri);
+                } catch (Exception ignore) {}
+                boolean isVideo = mime != null && mime.startsWith("video/");
+                int imageId = -1000000 - i;
+                MediaController.PhotoEntry entry = new MediaController.PhotoEntry(0, imageId, System.currentTimeMillis(), copied.getAbsolutePath(), 0, isVideo, 0, 0, copied.length());
+                entries.add(entry);
+            }
+            AndroidUtilities.runOnUIThread(() -> {
+                if (target.parentAlert == null || entries.isEmpty()) {
+                    target.systemPickerLaunched = false;
+                    return;
+                }
+                int accepted = 0;
+                for (MediaController.PhotoEntry entry : entries) {
+                    if (target.parentAlert.maxSelectedPhotos >= 0 && target.selectedPhotos.size() >= target.parentAlert.maxSelectedPhotos) {
+                        break;
+                    }
+                    if (entry.isVideo && !target.videoEnabled || !entry.isVideo && !target.photoEnabled) {
+                        continue;
+                    }
+                    target.selectedPhotos.put(entry.imageId, entry);
+                    target.selectedPhotosOrder.add(entry.imageId);
+                    accepted++;
+                }
+                if (accepted > 0) {
+                    target.parentAlert.updatePhotoPreview(true);
+                } else {
+                    target.systemPickerLaunched = false;
+                }
+            });
+        });
+    }
+
+    private static File copyPickerUri(ChatAttachAlertPhotoLayout layout, Uri uri, int index) {
+        InputStream input = null;
+        FileOutputStream output = null;
+        try {
+            String mime = layout.getContext().getContentResolver().getType(uri);
+            String extension = mime != null && mime.startsWith("video/") ? ".mp4" : ".jpg";
+            File directory = new File(ApplicationLoader.applicationContext.getCacheDir(), "picker_media");
+            if (!directory.exists() && !directory.mkdirs()) {
+                return null;
+            }
+            File file = new File(directory, "picked_" + System.currentTimeMillis() + "_" + index + extension);
+            input = layout.getContext().getContentResolver().openInputStream(uri);
+            if (input == null) {
+                return null;
+            }
+            output = new FileOutputStream(file);
+            byte[] buffer = new byte[64 * 1024];
+            int read;
+            while ((read = input.read(buffer)) != -1) {
+                output.write(buffer, 0, read);
+            }
+            output.flush();
+            return file;
+        } catch (Exception e) {
+            FileLog.e(e);
+            return null;
+        } finally {
+            try { if (input != null) input.close(); } catch (Exception ignore) {}
+            try { if (output != null) output.close(); } catch (Exception ignore) {}
+        }
+    }
+
+    public HashMap<Object, Object> getSelectedPhotos() {
             return selectedPhotos;
         }
 
@@ -3987,6 +4122,11 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
 
     @Override
     public void onShow(ChatAttachAlert.AttachAlertLayout previousLayout) {
+        if (!systemPickerLaunched && parentAlert != null && parentAlert.avatarPicker == 0 && !parentAlert.isPollAttach && parentAlert.baseFragment instanceof ChatActivity) {
+            systemPickerLaunched = true;
+            launchSystemPhotoPicker();
+            return;
+        }
         if (headerAnimator != null) {
             headerAnimator.cancel();
         }
